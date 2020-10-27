@@ -1,0 +1,119 @@
+# Get the Data
+rainfall<- read.csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2020/2020-01-07/rainfall.csv')
+temperature <-read.csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2020/2020-01-07/temperature.csv')
+
+# IF YOU USE THIS DATA PLEASE BE CAUTIOUS WITH INTERPRETATION
+nasa_fire<- read.csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2020/2020-01-07/MODIS_C6_Australia_and_New_Zealand_7d.csv')
+
+# For JSON File of fires
+url<- "http://www.rfs.nsw.gov.au/feeds/majorIncidents.json"
+aus_fires <- sf::st_read(url)
+
+library(ggplot2) 
+names(rainfall)
+range(rainfall$year)
+dim(rainfall)
+object.size(rainfall)
+
+# select 2019 rainfall data 
+rainfall2019 <-rainfall[which(rainfall$year == 2019),]
+
+# Check the number of missing values 
+sum(is.na(rainfall2019$rainfall))
+missing<-rainfall2019[is.na(rainfall2019$rainfall),]
+sort(table(missing$month))
+# June, October, september have the most missing value of rainfall
+sort(table(missing$station_name))
+# North Adelaide had the most missing values
+
+
+
+# select 2000 rainfall data 
+rainfall2000 <-rainfall[which(rainfall$year == 2000),]
+View(rainfall2000)
+# Check the number of missing values 
+sum(is.na(rainfall2000$rainfall))
+missing<-rainfall2000[is.na(rainfall2000$rainfall),]
+sort(table(missing$month))
+# 10  5  9 have the most missing value of rainfall
+sort(table(missing$station_name))
+# Greenslopes Private Hospital had the most missing values
+
+rainfall2009 <-rainfall[which(rainfall$year == 2009),]
+
+
+# filtering rainfall data
+rainfall_10yr <-rainfall[which(rainfall$year <=2019 & rainfall$year >= 2009 ),]
+dim(rainfall_10yr )
+head(rainfall_10yr )
+
+# sum rainfall by month
+library(dplyr)
+new_dt = rainfall_10yr %>% 
+  group_by(`year`,`month`) %>%
+  summarize(month_total = sum(`rainfall`, na.rm = TRUE))
+
+
+
+library(forecast)
+
+ts1<- ts(new_dt$month_total,start=c(2009, 1), end=c(2019, 12), frequency = 12)
+
+plot(ts1, xlab = "year", ylab = "rainfall in millimeters", 
+     main = "Rainfall in millimeters in Australia in recent 10 years")
+
+rain_forecasts <- HoltWinters(ts1, beta=FALSE, gamma=FALSE)
+plot(rain_forecasts)
+
+library(rworldmap)
+world <- getMap(resolution = "low")
+
+aus <- world[world$ADMIN == "Australia", ]
+
+# Stations in Australia
+ ggplot() +
+    geom_polygon(data = aus, 
+                 aes(x = long, y = lat, group = group),
+                 fill = NA, colour = "black") + 
+    geom_point(data =rainfall2019,  # Add and plot speices data
+               aes(x = long, y = lat, 
+                   colour = factor(station_name))) +
+    coord_quickmap() + 
+    theme_classic() +  # Remove ugly grey background
+    xlab("Longitude") +
+    ylab("Latitude") + 
+    guides(colour=guide_legend(title="Station Name"))
+
+# Monthly rainfall in Australia 2019
+ggplot(data = rainfall2019, aes(`month`, `rainfall`)) +
+  geom_bar(stat = "identity") +
+  scale_x_continuous(name="Month", breaks = seq(1,12,1)) +
+  ylab("rainfall in millimeters") + 
+  ggtitle("Monthly rainfall in Australia 2019")
+
+# line chart
+#ggplot(data = rainfall2019, aes(`day`, `rainfall`)) +
+  geom_line(aes(color = factor(`station_code`))) +
+  xlab("days") +
+  ylab("rainfall in millimeters") + 
+  ggtitle("Daily rainfall in Australia 2019")
+
+# Monthly Rainfall by station_code in Australia 2019
+ggplot(data = rainfall2019, aes(`month`, `rainfall`, fill = factor(`station_code`))) +
+  geom_bar(stat = "identity") +
+  scale_x_continuous(name="Month", breaks = seq(1,12,1)) +
+  ylab("rainfall in millimeters") + 
+  ggtitle("Monthly Rainfall by station_code in Australia 2019") +
+  facet_grid(rows = vars(`station_code`)) +
+  guides(fill=guide_legend(title="station code"))
+  
+library(dplyr)
+# Avearge rainfall per month
+avg <-aggregate(rainfall2019$rainfall, by = list(month = rainfall2019$month), mean, na.rm = TRUE)
+# Sum of rainfall per month
+sum <-aggregate(rainfall2019$rainfall, by = list(month = rainfall2019$month), sum, na.rm = TRUE)
+
+plot(avg$month, avg$x, type = "l")
+
+
+
