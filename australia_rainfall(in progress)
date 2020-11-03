@@ -1,0 +1,123 @@
+# Project Source: https://github.com/rfordatascience/tidytuesday/blob/master/data/2020/2020-01-07/readme.md
+
+# Get the Data
+rainfall<- read.csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2020/2020-01-07/rainfall.csv')
+temperature <-read.csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2020/2020-01-07/temperature.csv')
+
+# For JSON File of fires
+url<- "http://www.rfs.nsw.gov.au/feeds/majorIncidents.json"
+aus_fires <- sf::st_read(url)
+
+library(ggplot2)
+library(extrafont)
+font_import()
+# see what fonts are now available
+fonts()
+library(dplyr)
+library(forecast)
+library(rworldmap)
+library(lubridate)
+library(sf)
+library(raster)
+
+names(rainfall)
+range(rainfall$year)
+dim(rainfall)
+
+# select 2019 rainfall data 
+#rainfall2019 <-rainfall[which(rainfall$year == 2019),]
+rainfall2019 <- filter(rainfall, year == 2019) %>% filter(!is.na(rainfall))
+head(rainfall2019)
+# Let's see where the four stations located:
+
+world <- getMap(resolution = "low")
+
+aus <- world[world$ADMIN == "Australia", ]
+
+ ggplot() +
+  geom_polygon(data = aus, 
+               aes(x = long, y = lat, group = group),
+               fill = NA, colour = "black") + 
+  geom_point(data =rainfall2019,  # Add and plot speices data
+             aes(x = long, y = lat, 
+                 colour = factor(station_name))) +
+  coord_quickmap() + 
+  theme_classic() +  # Remove ugly grey background
+  xlab("Longitude") +
+  ylab("Latitude") + 
+  guides(colour=guide_legend(title="Station Name")) +
+   theme_minimal()
+
+
+
+# Monthly rainfall in Australia 2019 by station
+ggplot(rainfall2019b, aes(month, rainfall, fill = station_name)) +
+  geom_bar(stat = "identity") +
+  scale_x_continuous(name="Month", breaks = seq(1,12,1)) +
+  labs(title = "2019 Australia rainfall by month",
+       subtitle = "Note: NAs were removed.",
+       y = "rainfall in millimeters",x = "Month")+
+  facet_grid(vars(station_name)) +
+  theme_minimal()
+
+
+# filtering rainfall data
+rainfall_10yr <-rainfall[which(rainfall$year <=2019 & rainfall$year >= 2009 ),]
+# sum rainfall by month
+new_dt = rainfall_10yr %>% 
+  group_by(`year`,`month`) %>%
+  summarize(month_total = sum(`rainfall`, na.rm = TRUE))
+
+head(new_dt)
+
+
+ts1<- ts(new_dt$month_total,start=c(2009, 1), end=c(2019, 12), frequency = 12)
+
+plot(ts1, xlab = "year", ylab = "rainfall in millimeters", 
+     main = "Rainfall in millimeters in Australia in recent 10 years")
+
+rain_forecasts <- HoltWinters(ts1, beta=FALSE, gamma=FALSE)
+plot(rain_forecasts)
+  
+
+# Sum of rainfall per station in 2019
+aggregate(rainfall2019$rainfall,
+          by = list(station_name = rainfall2019$station_name), 
+          sum)
+
+temperature$date<- as.Date(temperature$date)
+
+temperature2019<- filter(temperature, year(date) == 2019) %>% filter(!is.na(temperature))
+
+
+dt = aggregate(temperature2019$temperature,
+          by = list(month = month(temperature2019$date),
+                    type= temperature2019$temp_type, 
+                    site_name = temperature2019$site_name), mean)
+dt = as.data.frame(dt)
+names(dt)
+         
+temperature2019$month <- month(temperature2019$date)
+
+ggplot(dt, aes(month,x, fill = site_name)) +
+  geom_bar(stat = "identity")  +
+  labs(title = "2019 Australia Temperature From Jan ~ May",
+       subtitle = "Average Temperature",
+       y = "temperature in C",x = "Month")+
+  facet_grid(site_name ~ type)+
+  theme_minimal()
+
+# since we just looked at the average temp from Jan till May,
+# let's now look at the rainfall amount during the same time period.
+
+# sum rainfall by month
+rainfall_sub = rainfall2019%>% 
+  group_by(`year`,`month`) %>%
+  summarize(month_total = sum(`rainfall`, na.rm = TRUE)) %>% filter(`month`< 6 & `month` >=1)
+
+head(rainfall_sub)
+
+ggplot(rainfall_sub, aes(month,month_total)) + geom_bar(stat = "identity") +
+  labs(title = "Total Rrainfall per Month in Australia 2019 Jan ~ May",  y = "Rainfall in Millimeters") +
+  theme(text = element_text(size = 15, family = "Berlin Sans FB"))+
+  theme_minimal()
