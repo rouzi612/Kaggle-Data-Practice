@@ -1,0 +1,76 @@
+---
+title: "Chocolate Rating Analysis"
+author: "Rosie Bai"
+date: "11/22/2020"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+## Data Preprocessing
+```{r}
+library(dplyr)
+library(ggplot2)
+flavors_of_cacao <- read.csv('https://raw.githubusercontent.com/rouzi612/R-weekly-project/main/flavors_of_cacao.csv')
+names(flavors_of_cacao)
+names(flavors_of_cacao)[1] = "maker"
+names(flavors_of_cacao)[2] = "Specific.Bean.Origin"
+str(flavors_of_cacao)
+flavors_of_cacao$Cocoa.Percent<-as.numeric(sub("%", "",flavors_of_cacao$Cocoa.Percent, fixed = TRUE))/100
+summary(flavors_of_cacao$Cocoa.Percent)
+
+```
+
+## Average Rating by Broad Bean Origin
+```{r}
+# Average Rating by Broad Bean Origin
+flavors_of_cacao %>%
+  group_by(`Broad.Bean.Origin`) %>%
+  summarise(`Rating` = mean(`Rating`)) %>% 
+  arrange(-`Rating`)%>%
+  top_n(20)
+
+```
+
+## Average Rating by Specific Bean Origin
+```{r}
+flavors_of_cacao %>%
+  group_by(`Specific.Bean.Origin`) %>%
+  summarise(`Rating` = mean(`Rating`)) %>% 
+  arrange(-`Rating`) %>%
+  top_n(20)
+
+
+```
+
+## Average Rating by Country
+```{r}
+flavors_of_cacao %>%
+  group_by(`Company.Location`) %>%
+  summarise(`Rating` = mean(`Rating`)) %>% 
+  arrange(-`Rating`) %>%
+  top_n(10)
+
+
+
+```
+
+
+
+```{r}
+ggplot(flavors_of_cacao, aes(x=`Cocoa.Percent`, y=`Rating`)) + 
+  geom_point(size=2, color = "tan") +
+  theme_light() +
+  geom_smooth(method='lm',formula=flavors_of_cacao$Rating~flavors_of_cacao$Cocoa.Percent) +
+  ggtitle("A scatter plot of Cocoa % and Rating")
+  
+
+plot(x = flavors_of_cacao$Cocoa.Percent, y = flavors_of_cacao$Rating, main = "Cocoa% vs. Chocolate Rating",
+     xlab = "Cocoa %", ylab = "Rating",
+     pch = 19, frame = FALSE)
+lines(lowess(x = flavors_of_cacao$Cocoa.Percent, y = flavors_of_cacao$Rating), col = "blue")
+
+```
+
+Conclusion: 70% Cocoa percentages tend to have higher rating.
+
